@@ -1,2 +1,2 @@
-# Waras-discordRPC
+# Wara's-discordRPC
 スマホなどに組み込まれた送信側信号をpcで受信しDiscordRPCに配信するプロジェクトです
