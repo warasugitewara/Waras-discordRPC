@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 
 SourceKind = Literal["generic", "music", "manual"]
+
+# 初出ソースに適用する永続設定を返す provider。未知なら None。
+SettingsProvider = Callable[[str], "dict[str, Any] | None"]
 
 
 @dataclass
@@ -33,8 +36,9 @@ class Source:
 class SourceRegistry:
     """すべての既知ソース(feed + manual)を保持する。"""
 
-    def __init__(self) -> None:
+    def __init__(self, settings_provider: SettingsProvider | None = None) -> None:
         self._sources: dict[str, Source] = {}
+        self._settings_provider = settings_provider
 
     def upsert(
         self,
@@ -49,16 +53,29 @@ class SourceRegistry:
         now = time.time()
         source = self._sources.get(source_id)
         if source is None:
+            # 初出時のみ表示名を決める(永続設定 > feedのsource_name > source_id)。
+            # 以後は GUI でのリネームを保持するため feed の name で上書きしない。
             source = Source(source_id=source_id, name=name or source_id, kind=kind)
+            self._apply_persisted_settings(source)
             self._sources[source_id] = source
-        if name:
-            source.name = name
         source.kind = kind
         source.data = data
         source.updated_at = now
         source.expires_at = now + ttl_seconds if ttl_seconds is not None else None
         source.origin_conn = origin_conn
         return source
+
+    def _apply_persisted_settings(self, source: Source) -> None:
+        if self._settings_provider is None:
+            return
+        settings = self._settings_provider(source.source_id)
+        if not settings:
+            return
+        if settings.get("name"):
+            source.name = settings["name"]
+        source.enabled = settings.get("enabled", source.enabled)
+        source.priority = settings.get("priority", source.priority)
+        source.pinned = settings.get("pinned", source.pinned)
 
     def get(self, source_id: str) -> Source | None:
         return self._sources.get(source_id)
