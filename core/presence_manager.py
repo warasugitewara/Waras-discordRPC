@@ -1,6 +1,7 @@
 """SourceRegistry を調停して勝者を選び、mapper→discord_rpc へ送る。"""
 from __future__ import annotations
 
+import copy
 import time
 from typing import Any, Callable
 
@@ -31,7 +32,11 @@ class PresenceManager:
         self._discord_rpc = discord_rpc
         self._config = config
         self._clock = clock
-        self._last_sent_activity: dict[str, Any] | None = None
+        # 送信済みを「勝者の論理データ」で記録する。mapper は music の進捗計算に
+        # 実時刻を使うため、マップ後 activity で比較すると同一曲でも毎回ズレて
+        # 不要に再送される。送信判定は data の変化(=曲変更/再生停止/シーク)で行う。
+        self._last_sent_source_id: str | None = None
+        self._last_sent_data: dict[str, Any] | None = None
         self._last_sent_at: float = 0.0
         self._active_source_id: str | None = None
 
@@ -48,27 +53,33 @@ class PresenceManager:
             self._active_source_id = None
             return await self._clear_if_needed()
 
-        activity = to_activity(winner.kind, winner.data or {}, self._config)
         self._active_source_id = winner.source_id
+        activity = to_activity(winner.kind, winner.data or {}, self._config)
 
         if activity is None:
             return await self._clear_if_needed()
 
-        if activity == self._last_sent_activity:
+        unchanged = (
+            winner.source_id == self._last_sent_source_id
+            and winner.data == self._last_sent_data
+        )
+        if unchanged:
             return False
 
         min_interval = self._config.get("min_update_interval", 15)
-        if self._last_sent_activity is not None and now - self._last_sent_at < min_interval:
+        if self._last_sent_source_id is not None and now - self._last_sent_at < min_interval:
             return False
 
         sent = await self._discord_rpc.set_activity(activity)
         if sent:
-            self._last_sent_activity = activity
+            self._last_sent_source_id = winner.source_id
+            self._last_sent_data = copy.deepcopy(winner.data)
             self._last_sent_at = now
         return sent
 
     async def _clear_if_needed(self) -> bool:
-        if self._last_sent_activity is None:
+        if self._last_sent_source_id is None:
             return False
-        self._last_sent_activity = None
+        self._last_sent_source_id = None
+        self._last_sent_data = None
         return await self._discord_rpc.clear()

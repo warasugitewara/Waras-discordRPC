@@ -77,6 +77,10 @@ class DiscordRPC:
 
     async def set_activity(self, activity: dict[str, Any]) -> bool:
         """activity dict を Discord へ送信する。失敗時は disconnected を通知し False を返す。"""
+        if not self._connected:
+            # 未接続のまま update() を叩くと pypresence が捕捉対象外の例外
+            # (writer 未初期化など)を投げうるため、接続前は送らない。
+            return False
         payload = dict(activity)
         if "activity_type" in payload and isinstance(payload["activity_type"], str):
             payload["activity_type"] = ACTIVITY_TYPE_MAP[payload["activity_type"]]
@@ -89,6 +93,8 @@ class DiscordRPC:
             return False
 
     async def clear(self) -> bool:
+        if not self._connected:
+            return False
         try:
             await self._presence.clear()
             return True

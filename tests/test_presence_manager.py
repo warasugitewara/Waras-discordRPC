@@ -111,6 +111,35 @@ async def test_update_sent_after_min_interval_elapses():
     assert discord_rpc.set_activity.await_count == 2
 
 
+async def test_music_same_data_not_resent_after_interval():
+    # mapper は music の start/end を実時刻から計算するため、マップ後 activity で
+    # 比較すると同一曲でも毎回ズレて再送されてしまう。データ不変なら間隔経過後も
+    # 再送しないことを保証する(進捗バーは Discord 側が描画する)。
+    registry, discord_rpc, clock, manager = make_manager()
+    registry.upsert("phone-music", "music", {"title": "Strobe", "artist": "deadmau5"})
+    await manager.reevaluate()
+
+    clock.advance(60)
+    registry.upsert("phone-music", "music", {"title": "Strobe", "artist": "deadmau5"})
+    sent = await manager.reevaluate()
+
+    assert sent is False
+    discord_rpc.set_activity.assert_awaited_once()
+
+
+async def test_music_song_change_is_resent():
+    registry, discord_rpc, clock, manager = make_manager()
+    registry.upsert("phone-music", "music", {"title": "Strobe", "artist": "deadmau5"})
+    await manager.reevaluate()
+
+    clock.advance(16)
+    registry.upsert("phone-music", "music", {"title": "Ghosts n Stuff", "artist": "deadmau5"})
+    sent = await manager.reevaluate()
+
+    assert sent is True
+    assert discord_rpc.set_activity.await_count == 2
+
+
 async def test_winner_disappearing_triggers_clear():
     registry, discord_rpc, clock, manager = make_manager()
     registry.upsert("a", "generic", {"details": "a"})

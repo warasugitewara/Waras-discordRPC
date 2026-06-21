@@ -11,9 +11,27 @@ from typing import Any
 
 MAX_BUTTONS = 2
 
+# generic / manual で共通の表示フィールド(値が真のときのみ activity へコピーする)。
+_DISPLAY_FIELDS = (
+    "details",
+    "state",
+    "large_image",
+    "large_text",
+    "small_image",
+    "small_text",
+)
+
 
 def _buttons_payload(buttons: list[dict[str, Any]]) -> list[dict[str, str]]:
     return [{"label": b["label"], "url": b["url"]} for b in buttons[:MAX_BUTTONS]]
+
+
+def _apply_display_fields(data: dict[str, Any], activity: dict[str, Any]) -> None:
+    for key in _DISPLAY_FIELDS:
+        if data.get(key):
+            activity[key] = data[key]
+    if data.get("buttons"):
+        activity["buttons"] = _buttons_payload(data["buttons"])
 
 
 def _is_blacklisted(text: str | None, blacklist: list[str]) -> bool:
@@ -25,24 +43,11 @@ def _is_blacklisted(text: str | None, blacklist: list[str]) -> bool:
 
 def map_generic(data: dict[str, Any], config: dict[str, Any]) -> dict[str, Any] | None:
     activity: dict[str, Any] = {"activity_type": data.get("activity_type", "playing")}
-    if data.get("details"):
-        activity["details"] = data["details"]
-    if data.get("state"):
-        activity["state"] = data["state"]
-    if data.get("large_image"):
-        activity["large_image"] = data["large_image"]
-    if data.get("large_text"):
-        activity["large_text"] = data["large_text"]
-    if data.get("small_image"):
-        activity["small_image"] = data["small_image"]
-    if data.get("small_text"):
-        activity["small_text"] = data["small_text"]
+    _apply_display_fields(data, activity)
     if data.get("start_ms") is not None:
         activity["start"] = data["start_ms"]
     if data.get("end_ms") is not None:
         activity["end"] = data["end_ms"]
-    if data.get("buttons"):
-        activity["buttons"] = _buttons_payload(data["buttons"])
     if data.get("party"):
         activity["party_size"] = [data["party"]["size"], data["party"]["max"]]
     return activity
@@ -83,20 +88,7 @@ def map_manual(
     online_since_ms: int | None = None,
 ) -> dict[str, Any] | None:
     activity: dict[str, Any] = {"activity_type": data.get("activity_type", "playing")}
-    if data.get("details"):
-        activity["details"] = data["details"]
-    if data.get("state"):
-        activity["state"] = data["state"]
-    if data.get("large_image"):
-        activity["large_image"] = data["large_image"]
-    if data.get("large_text"):
-        activity["large_text"] = data["large_text"]
-    if data.get("small_image"):
-        activity["small_image"] = data["small_image"]
-    if data.get("small_text"):
-        activity["small_text"] = data["small_text"]
-    if data.get("buttons"):
-        activity["buttons"] = _buttons_payload(data["buttons"])
+    _apply_display_fields(data, activity)
 
     timestamp_mode = data.get("timestamp_mode", "none")
     if timestamp_mode == "custom":

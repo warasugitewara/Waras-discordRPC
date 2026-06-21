@@ -90,6 +90,26 @@ async def test_set_activity_failure_marks_disconnected():
     await rpc.stop()
 
 
+async def test_set_activity_skips_when_not_connected():
+    client = AsyncMock()
+    rpc = make_rpc(client)  # start() を呼ばないので未接続
+
+    ok = await rpc.set_activity({"details": "Working"})
+
+    assert ok is False
+    client.update.assert_not_called()
+
+
+async def test_clear_skips_when_not_connected():
+    client = AsyncMock()
+    rpc = make_rpc(client)
+
+    ok = await rpc.clear()
+
+    assert ok is False
+    client.clear.assert_not_called()
+
+
 async def test_clear_success():
     client = AsyncMock()
     rpc = make_rpc(client)

@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import time
 from collections import deque
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from typing import Any, Protocol
 
 from aiohttp import web
@@ -58,6 +58,10 @@ class RateLimiter:
             return False
         hits.append(now)
         return True
+
+    def release(self, key: Any) -> None:
+        """キー(WS接続オブジェクト等)を破棄する。切断時に呼んでリークを防ぐ。"""
+        self._hits.pop(key, None)
 
 
 def _extract_token(request: web.Request) -> str | None:
@@ -148,6 +152,7 @@ def create_app(
             else:
                 await ws.send_json({"op": "error", "message": f"unknown op: {op}"})
 
+        limiter.release(ws)
         registry.expire_for_conn(ws)
         await presence_manager.reevaluate()
         return ws

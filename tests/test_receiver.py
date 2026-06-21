@@ -11,6 +11,17 @@ BRIDGE_TOKEN = "secret-token"
 AUTH_HEADERS = {"Authorization": f"Bearer {BRIDGE_TOKEN}"}
 
 
+def test_rate_limiter_release_evicts_key():
+    limiter = RateLimiter(max_messages=1, window_seconds=60.0)
+    key = object()
+    assert limiter.allow(key) is True
+    assert limiter.allow(key) is False  # 上限到達
+
+    limiter.release(key)
+
+    assert limiter.allow(key) is True  # キー破棄後はリセットされる
+
+
 def make_client_deps():
     registry = SourceRegistry()
     discord_rpc = AsyncMock()
