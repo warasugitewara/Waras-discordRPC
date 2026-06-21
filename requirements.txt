@@ -1,0 +1,11 @@
+pypresence
+aiohttp
+pydantic>=2
+PySide6
+qasync
+python-dotenv
+
+# dev
+pytest
+pytest-asyncio
+pyinstaller

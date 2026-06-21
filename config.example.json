@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "network_mode": "local",
+  "bind": "127.0.0.1",
+  "port": 13520,
+  "client_id": "",
+  "selection_policy": "priority",
+  "sources": {
+    "phone-music": { "name": "Phone • Music", "enabled": true, "priority": 1, "pinned": false }
+  },
+  "manual": null,
+  "display": {
+    "default_activity_type": "playing",
+    "show_small_image": true
+  },
+  "buttons": [],
+  "assets": {
+    "play": "play",
+    "pause": "pause",
+    "idle": "idle"
+  },
+  "blacklist": [],
+  "auto_clear_on_disconnect": true,
+  "ttl_seconds": 30,
+  "min_update_interval": 15
+}
