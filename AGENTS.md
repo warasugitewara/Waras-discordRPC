@@ -4,7 +4,10 @@
 Claude Code は `CLAUDE.md` 経由でここを参照する。**着手前に必ず本ファイルと `docs/` を読む。**
 
 ## 現状
-- **設計のみ完了、コード未実装**。まず仕様を読んでから着手する。
+- **実装中**。[`docs/DESIGN.md`](docs/DESIGN.md)「実装順序」のマイルストーン **1〜5 完了**
+  (config / models / discord_rpc / sources+mapper+presence_manager / receiver)。
+  **6(GUI)以降が未着手**。最新の進捗表は [`README.md`](README.md) の「進捗(マイルストーン)」を見る。
+  着手前に必ず本ファイルと `docs/` および既存の `core/`・`tests/` を読む。
 - 権威ある情報源(SoT):
   - 設計全体 … [`docs/DESIGN.md`](docs/DESIGN.md)
   - 通信契約(Android↔PC)… [`docs/PROTOCOL.md`](docs/PROTOCOL.md)
