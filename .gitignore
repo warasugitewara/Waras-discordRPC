@@ -1,0 +1,48 @@
+# ===== Secrets / runtime config — NEVER commit =====
+.env
+config.json
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ===== Logs =====
+*.log
+logs/
+
+# ===== PyInstaller build artifacts =====
+build/
+dist/
+
+# ===== AI =====
+CLAUDE.md
+
+# ===== エディタ / IDE =====
+# VSCode
+.vscode/
+*.code-workspace
+# Neovim / Vim
+*.swp
+*.swo
+*~
+[._]*.s[a-v][a-z]
+Session.vim
+.netrwhist
+tags
+.nvimlog
+# JetBrains / IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
