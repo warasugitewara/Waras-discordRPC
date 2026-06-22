@@ -24,7 +24,33 @@ def _schedule(coro: Awaitable[Any]) -> "asyncio.Task[Any]":
     return asyncio.ensure_future(coro)
 
 
+def _resource_path(relative: str) -> Path:
+    """同梱リソース(assets/等)のパスを解決する。
+
+    PyInstaller(onedir/onefile)で frozen された場合は sys._MEIPASS 基準、
+    通常実行時はこのファイルのあるディレクトリ基準。config.json/.env は
+    ユーザー編集用としてカレントディレクトリ基準のままここでは扱わない。
+    """
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    return base / relative
+
+
+def _ensure_log_streams() -> None:
+    """windowed(console=False)な PyInstaller exe では sys.stdout/stderr が None になる。
+
+    logging が None.write() で例外を出すと、終了処理中の asyncio タスクが
+    そこで死んで loop.stop() まで到達できず、アプリが終了しなくなる。
+    None の場合のみログファイルへ差し替える(通常実行/devでは何もしない)。
+    """
+    if sys.stderr is not None and sys.stdout is not None:
+        return
+    log_file = open(Path("app.log"), "a", encoding="utf-8")
+    sys.stdout = sys.stdout or log_file
+    sys.stderr = sys.stderr or log_file
+
+
 def main(argv: list[str] | None = None) -> int:
+    _ensure_log_streams()
     logging.basicConfig(level=logging.INFO)
 
     # 重い GUI/非同期依存は main 内で遅延 import(テストや headless 解析を妨げない)。
@@ -68,7 +94,7 @@ def main(argv: list[str] | None = None) -> int:
     if not QSystemTrayIcon.isSystemTrayAvailable():
         QMessageBox.warning(None, "Wara's-discordRPC", "システムトレイが利用できません。")
 
-    icon_path = Path("assets/tray_icon.png")
+    icon_path = _resource_path("assets/tray_icon.png")
     icon = QIcon(str(icon_path)) if icon_path.exists() else None
     if icon is not None:
         app.setWindowIcon(icon)

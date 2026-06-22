@@ -12,7 +12,7 @@ import logging
 from typing import Any, Literal, Protocol
 
 from pypresence import AioPresence
-from pypresence.exceptions import DiscordNotFound, InvalidPipe, PipeClosed
+from pypresence.exceptions import PyPresenceException
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ RECONNECT_BASE_DELAY = 1.0
 RECONNECT_MAX_DELAY = 30.0
 SUPERVISOR_POLL_INTERVAL = 1.0
 
-_CONNECTION_ERRORS = (DiscordNotFound, InvalidPipe, PipeClosed, OSError)
+_CONNECTION_ERRORS = (PyPresenceException, OSError)
 
 
 class PresenceClient(Protocol):
