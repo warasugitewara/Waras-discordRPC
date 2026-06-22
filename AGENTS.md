@@ -4,10 +4,19 @@
 Claude Code は `CLAUDE.md` 経由でここを参照する。**着手前に必ず本ファイルと `docs/` を読む。**
 
 ## 現状
-- **実装中**。[`docs/DESIGN.md`](docs/DESIGN.md)「実装順序」のマイルストーン **1〜5 完了**
-  (config / models / discord_rpc / sources+mapper+presence_manager / receiver)。
-  **6(GUI)以降が未着手**。最新の進捗表は [`README.md`](README.md) の「進捗(マイルストーン)」を見る。
+- **実装中**。[`docs/DESIGN.md`](docs/DESIGN.md)「実装順序」のマイルストーン **1〜7 実装済**
+  (config / models / discord_rpc / sources+mapper+presence_manager / receiver /
+  engineオーケストレータ+Qt GUI / tools/send_test+手動E2E)。**6(GUI)は実機(Windows 11
+  + Discord Desktop)で手動E2E検証済み**(トレイ常駐・generic/music表示・複数ソース調停
+  (優先度/pin)・`/clear`・TTL失効・Discord再起動時の再接続・手動モード)。**8 が未着手**。
+  最新の進捗表は [`README.md`](README.md) の「進捗(マイルストーン)」を見る。
   着手前に必ず本ファイルと `docs/` および既存の `core/`・`tests/` を読む。
+- 実機E2Eで見つけて修正した不具合: ① トレイアイコンが空アイコンで非表示
+  (`app.py` が `Tray` に `parent` を渡していなかった) ② receiver(HTTP/WS)経由の更新が
+  GUI一覧に反映されない(`Engine._notify()` 未結線 → `core/engine.py` に
+  `_NotifyingPresenceManager` を追加して解消) ③ pin(固定)が複数ソースで同時にON可能だった
+  → `SourceRegistry.set_pinned()` を排他化。
+- ローカル venv 構築済・`pytest` **100件成功(skip/warning無し)** を確認済み(2026-06-22)。
 - 権威ある情報源(SoT):
   - 設計全体 … [`docs/DESIGN.md`](docs/DESIGN.md)
   - 通信契約(Android↔PC)… [`docs/PROTOCOL.md`](docs/PROTOCOL.md)
