@@ -29,6 +29,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # 重い GUI/非同期依存は main 内で遅延 import(テストや headless 解析を妨げない)。
     import qasync
+    from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
     from core.engine import Engine
@@ -67,7 +68,12 @@ def main(argv: list[str] | None = None) -> int:
     if not QSystemTrayIcon.isSystemTrayAvailable():
         QMessageBox.warning(None, "Wara's-discordRPC", "システムトレイが利用できません。")
 
-    tray = Tray(engine, on_open_settings=open_settings, on_quit=quit_app, parent=window)
+    icon_path = Path("assets/tray_icon.png")
+    icon = QIcon(str(icon_path)) if icon_path.exists() else None
+    if icon is not None:
+        app.setWindowIcon(icon)
+        window.setWindowIcon(icon)
+    tray = Tray(engine, on_open_settings=open_settings, on_quit=quit_app, icon=icon, parent=window)
     tray.show()
 
     with contextlib_suppress():
