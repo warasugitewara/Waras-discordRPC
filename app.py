@@ -67,7 +67,7 @@ def main(argv: list[str] | None = None) -> int:
     if not QSystemTrayIcon.isSystemTrayAvailable():
         QMessageBox.warning(None, "Wara's-discordRPC", "システムトレイが利用できません。")
 
-    tray = Tray(engine, on_open_settings=open_settings, on_quit=quit_app)
+    tray = Tray(engine, on_open_settings=open_settings, on_quit=quit_app, parent=window)
     tray.show()
 
     with contextlib_suppress():

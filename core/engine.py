@@ -32,6 +32,27 @@ MANUAL_SOURCE_ID = "manual"
 DEFAULT_TICK_INTERVAL = 5.0
 
 
+class _NotifyingPresenceManager:
+    """receiver(HTTP/WS)経由の reevaluate でも GUI リスナーへ通知する PresenceManager ラッパー。
+
+    PresenceManager.reevaluate() は registry/active_source の変化を返り値(送信有無)でしか
+    伝えないため、receiver 経由の更新だと GUI(Engine の listener)が呼ばれず一覧が古いままになる。
+    """
+
+    def __init__(self, presence_manager: PresenceManager, notify: Callable[[], None]) -> None:
+        self._pm = presence_manager
+        self._notify = notify
+
+    @property
+    def active_source_id(self) -> str | None:
+        return self._pm.active_source_id
+
+    async def reevaluate(self) -> bool:
+        result = await self._pm.reevaluate()
+        self._notify()
+        return result
+
+
 class Engine:
     def __init__(
         self,
@@ -59,6 +80,7 @@ class Engine:
         self._site: web.TCPSite | None = None
         self._tick_task: asyncio.Task[None] | None = None
         self._listeners: list[Callable[[], None]] = []
+        self._notifying_pm = _NotifyingPresenceManager(self._pm, self._notify)
 
     # ---- 公開プロパティ(GUI/テスト用) ----
     @property
@@ -88,7 +110,7 @@ class Engine:
         app = create_app(
             bridge_token=getattr(self._secrets, "bridge_token", ""),
             registry=self._registry,
-            presence_manager=self._pm,
+            presence_manager=self._notifying_pm,
             discord_rpc=self._discord_rpc,
             ttl_seconds=self._config.get("ttl_seconds", 30),
         )
@@ -136,7 +158,12 @@ class Engine:
 
     async def set_source_pinned(self, source_id: str, pinned: bool) -> None:
         self._registry.set_pinned(source_id, pinned)
-        self._persist_source(source_id)
+        if pinned:
+            # pin は排他なので、他ソースの pinned=False への変化も永続化する。
+            for s in self._registry.all():
+                self._persist_source(s.source_id)
+        else:
+            self._persist_source(source_id)
         await self._reevaluate_and_notify()
 
     async def forget_source(self, source_id: str) -> None:

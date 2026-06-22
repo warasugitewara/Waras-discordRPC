@@ -71,6 +71,30 @@ def test_expire_for_conn_clears_only_matching_sources():
     assert registry.get("b").data == {"details": "y"}
 
 
+def test_set_pinned_is_exclusive_across_sources():
+    registry = SourceRegistry()
+    registry.upsert("a", "generic", {"details": "x"})
+    registry.upsert("b", "generic", {"details": "y"})
+
+    registry.set_pinned("a", True)
+    registry.set_pinned("b", True)
+
+    assert registry.get("a").pinned is False
+    assert registry.get("b").pinned is True
+
+
+def test_set_pinned_false_does_not_affect_others():
+    registry = SourceRegistry()
+    registry.upsert("a", "generic", {"details": "x"})
+    registry.upsert("b", "generic", {"details": "y"})
+    registry.set_pinned("a", True)
+
+    registry.set_pinned("a", False)
+
+    assert registry.get("a").pinned is False
+    assert registry.get("b").pinned is False
+
+
 def test_remove_deletes_source_entirely():
     registry = SourceRegistry()
     registry.upsert("a", "generic", {"details": "x"})

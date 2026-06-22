@@ -220,3 +220,33 @@ async def test_start_and_stop_bind_real_port():
                 assert body["status"] == "ok"
     finally:
         await engine.stop()
+
+
+async def test_listener_notified_on_receiver_presence():
+    # receiver(HTTP/WS)経由の更新でも GUI リスナーが呼ばれることを確認する
+    # (バグ修正: 以前は presence_manager.reevaluate() のみで Engine._notify() が呼ばれなかった)。
+    import aiohttp
+
+    config = {"bind": "127.0.0.1", "port": 13598, "ttl_seconds": 30, "min_update_interval": 0}
+    engine = Engine(config, FakeSecrets(), discord_rpc=_connected_mock(), tick_interval=0.01)
+    calls = []
+    engine.add_listener(lambda: calls.append(1))
+    await engine.start()
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                "http://127.0.0.1:13598/presence",
+                headers={"Authorization": "Bearer tok"},
+                json={
+                    "op": "presence",
+                    "kind": "generic",
+                    "source_id": "a",
+                    "data": {"kind": "generic", "details": "Working"},
+                },
+            ) as resp:
+                assert resp.status == 200
+    finally:
+        await engine.stop()
+
+    assert len(calls) >= 1
+    assert engine.active_source_id == "a"

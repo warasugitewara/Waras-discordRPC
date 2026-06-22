@@ -92,8 +92,14 @@ class SourceRegistry:
             self._sources[source_id].priority = priority
 
     def set_pinned(self, source_id: str, pinned: bool) -> None:
-        if source_id in self._sources:
-            self._sources[source_id].pinned = pinned
+        """pin は排他(同時に1つだけ)。ON にした source 以外の pin は自動で外す。"""
+        if source_id not in self._sources:
+            return
+        if pinned:
+            for other in self._sources.values():
+                if other.source_id != source_id:
+                    other.pinned = False
+        self._sources[source_id].pinned = pinned
 
     def remove(self, source_id: str) -> None:
         """GUIの「忘れる」操作。"""
