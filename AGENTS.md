@@ -4,18 +4,24 @@
 Claude Code は `CLAUDE.md` 経由でここを参照する。**着手前に必ず本ファイルと `docs/` を読む。**
 
 ## 現状
-- **実装中**。[`docs/DESIGN.md`](docs/DESIGN.md)「実装順序」のマイルストーン **1〜7 実装済**
+- **v1 実装完了**。[`docs/DESIGN.md`](docs/DESIGN.md)「実装順序」のマイルストーン **1〜8 すべて実装済**
   (config / models / discord_rpc / sources+mapper+presence_manager / receiver /
-  engineオーケストレータ+Qt GUI / tools/send_test+手動E2E)。**6(GUI)は実機(Windows 11
-  + Discord Desktop)で手動E2E検証済み**(トレイ常駐・generic/music表示・複数ソース調停
-  (優先度/pin)・`/clear`・TTL失効・Discord再起動時の再接続・手動モード)。**8 が未着手**。
+  engineオーケストレータ+Qt GUI / tools/send_test+手動E2E / PyInstaller配布)。**6(GUI)・8(配布)
+  は実機(Windows 11 + Discord Desktop)で手動E2E検証済み**(トレイ常駐・generic/music表示・
+  複数ソース調停(優先度/pin)・`/clear`・TTL失効・Discord再起動時の再接続・手動モード・
+  packaged exeの起動/終了)。
   最新の進捗表は [`README.md`](README.md) の「進捗(マイルストーン)」を見る。
   着手前に必ず本ファイルと `docs/` および既存の `core/`・`tests/` を読む。
 - 実機E2Eで見つけて修正した不具合: ① トレイアイコンが空アイコンで非表示
   (`app.py` が `Tray` に `parent` を渡していなかった) ② receiver(HTTP/WS)経由の更新が
   GUI一覧に反映されない(`Engine._notify()` 未結線 → `core/engine.py` に
   `_NotifyingPresenceManager` を追加して解消) ③ pin(固定)が複数ソースで同時にON可能だった
-  → `SourceRegistry.set_pinned()` を排他化。
+  → `SourceRegistry.set_pinned()` を排他化。④ `start.bat` がLF改行で起動できない
+  (`unix2dos`でCRLF化)。⑤ packaged exe(`console=False`)でタスクトレイの「終了」が効かない
+  (`sys.stdout`/`stderr`が`None`でログ出力時に例外、かつ`DiscordRPC`の再接続ループが
+  `pypresence`の`DiscordError`系を捕捉していなかったため終了処理が中断 →
+  `app.py`に`_ensure_log_streams()`追加、`core/discord_rpc.py`の捕捉対象を
+  `PyPresenceException`基底クラスへ拡大して解消)。
 - ローカル venv 構築済・`pytest` **100件成功(skip/warning無し)** を確認済み(2026-06-22)。
 - 権威ある情報源(SoT):
   - 設計全体 … [`docs/DESIGN.md`](docs/DESIGN.md)
