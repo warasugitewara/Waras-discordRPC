@@ -135,8 +135,8 @@ def test_config_window_manual_form_validation_blocks_empty(qapp):
     window = ConfigWindow(engine, schedule)
 
     # details/state を空にすると検証エラーで apply_manual は呼ばれない
-    window._m_details.setText("")
-    window._m_state.setText("")
+    window._m_fields["details"].setText("")
+    window._m_fields["state"].setText("")
     window._on_apply_manual()
 
     assert all(c[0] != "manual" for c in engine.calls)
@@ -150,8 +150,8 @@ def test_config_window_manual_apply_schedules_engine_call(qapp):
     schedule, _ = make_scheduler(engine)
     window = ConfigWindow(engine, schedule)
 
-    window._m_details.setText("Working")
-    window._m_state.setText("Focus")
+    window._m_fields["details"].setText("Working")
+    window._m_fields["state"].setText("Focus")
     window._on_apply_manual()
 
     manual_calls = [c for c in engine.calls if c[0] == "manual"]
