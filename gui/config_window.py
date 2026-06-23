@@ -29,6 +29,14 @@ from gui.preview import PreviewWidget
 Scheduler = Callable[[Awaitable[Any]], Any]
 
 ACTIVITY_TYPES = ["playing", "listening", "watching", "competing"]
+MANUAL_TEXT_FIELDS = (
+    "details",
+    "state",
+    "large_image",
+    "large_text",
+    "small_image",
+    "small_text",
+)
 
 
 class ConfigWindow(QWidget):
@@ -114,20 +122,13 @@ class ConfigWindow(QWidget):
 
         self._m_activity = QComboBox()
         self._m_activity.addItems(ACTIVITY_TYPES)
-        self._m_details = QLineEdit()
-        self._m_state = QLineEdit()
-        self._m_large_image = QLineEdit()
-        self._m_large_text = QLineEdit()
-        self._m_small_image = QLineEdit()
-        self._m_small_text = QLineEdit()
+        self._m_fields: dict[str, QLineEdit] = {
+            key: QLineEdit() for key in MANUAL_TEXT_FIELDS
+        }
 
         form.addRow("activity_type", self._m_activity)
-        form.addRow("details", self._m_details)
-        form.addRow("state", self._m_state)
-        form.addRow("large_image", self._m_large_image)
-        form.addRow("large_text", self._m_large_text)
-        form.addRow("small_image", self._m_small_image)
-        form.addRow("small_text", self._m_small_text)
+        for key, field in self._m_fields.items():
+            form.addRow(key, field)
 
         self._m_error = QLabel("")
         self._m_error.setStyleSheet("color: #c0392b;")
@@ -150,25 +151,13 @@ class ConfigWindow(QWidget):
     def _load_manual_into_form(self) -> None:
         manual = self._engine.config.get("manual") or {}
         self._m_activity.setCurrentText(manual.get("activity_type", "playing"))
-        self._m_details.setText(manual.get("details", "") or "")
-        self._m_state.setText(manual.get("state", "") or "")
-        self._m_large_image.setText(manual.get("large_image", "") or "")
-        self._m_large_text.setText(manual.get("large_text", "") or "")
-        self._m_small_image.setText(manual.get("small_image", "") or "")
-        self._m_small_text.setText(manual.get("small_text", "") or "")
+        for key, widget in self._m_fields.items():
+            widget.setText(manual.get(key, "") or "")
 
     def manual_form_data(self) -> dict[str, Any]:
         """フォーム入力を ManualData 互換の dict に変換する(空欄は除外)。"""
         data: dict[str, Any] = {"activity_type": self._m_activity.currentText()}
-        fields = {
-            "details": self._m_details,
-            "state": self._m_state,
-            "large_image": self._m_large_image,
-            "large_text": self._m_large_text,
-            "small_image": self._m_small_image,
-            "small_text": self._m_small_text,
-        }
-        for key, widget in fields.items():
+        for key, widget in self._m_fields.items():
             text = widget.text().strip()
             if text:
                 data[key] = text

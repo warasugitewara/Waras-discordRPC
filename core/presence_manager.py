@@ -1,7 +1,6 @@
 """SourceRegistry を調停して勝者を選び、mapper→discord_rpc へ送る。"""
 from __future__ import annotations
 
-import copy
 import time
 from typing import Any, Callable
 
@@ -73,7 +72,7 @@ class PresenceManager:
         sent = await self._discord_rpc.set_activity(activity)
         if sent:
             self._last_sent_source_id = winner.source_id
-            self._last_sent_data = copy.deepcopy(winner.data)
+            self._last_sent_data = dict(winner.data) if winner.data is not None else None
             self._last_sent_at = now
         return sent
 

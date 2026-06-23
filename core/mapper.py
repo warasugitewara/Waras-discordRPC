@@ -102,14 +102,11 @@ def map_manual(
     return activity
 
 
-_MAPPERS = {"generic": map_generic, "music": map_music, "manual": map_manual}
-
-
 def to_activity(kind: str, data: dict[str, Any], config: dict[str, Any], **kwargs: Any) -> dict[str, Any] | None:
-    try:
-        mapper = _MAPPERS[kind]
-    except KeyError:
-        raise ValueError(f"unknown kind: {kind}") from None
+    if kind == "generic":
+        return map_generic(data, config)
+    if kind == "music":
+        return map_music(data, config)
     if kind == "manual":
-        return mapper(data, config, online_since_ms=kwargs.get("online_since_ms"))
-    return mapper(data, config)
+        return map_manual(data, config, online_since_ms=kwargs.get("online_since_ms"))
+    raise ValueError(f"unknown kind: {kind}")
