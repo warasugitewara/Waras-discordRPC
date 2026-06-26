@@ -13,12 +13,13 @@ import asyncio
 import contextlib
 import logging
 import time
+from pathlib import Path
 from typing import Any, Callable
 
 from aiohttp import web
 from pydantic import ValidationError
 
-from config.store import ConfigStore
+from config.store import ConfigStore, Secrets, resolve_bind
 from core.discord_rpc import DiscordRPC
 from core.mapper import to_activity
 from core.models import ManualData
@@ -60,6 +61,7 @@ class Engine:
         secrets: Any,
         store: ConfigStore | None = None,
         *,
+        env_path: Path | str = Path(".env"),
         discord_rpc: DiscordRPC | None = None,
         registry: SourceRegistry | None = None,
         clock: Callable[[], float] | None = None,
@@ -68,6 +70,7 @@ class Engine:
         self._config = config
         self._secrets = secrets
         self._store = store
+        self._env_path = Path(env_path)
         self._tick_interval = tick_interval
         self._clock = clock or time.time
         self._registry = registry or SourceRegistry(settings_provider=self._persisted_source_settings)
@@ -116,7 +119,7 @@ class Engine:
         )
         self._runner = web.AppRunner(app)
         await self._runner.setup()
-        bind = self._config.get("bind", "127.0.0.1")
+        bind = resolve_bind(self._config)
         port = self._config.get("port", 13520)
         self._site = web.TCPSite(self._runner, bind, port)
         await self._site.start()
@@ -183,6 +186,42 @@ class Engine:
     async def clear_manual(self) -> None:
         self._registry.clear_source(MANUAL_SOURCE_ID)
         await self._reevaluate_and_notify()
+
+    # ---- 接続設定(GUI/ウィザード用) ----
+    def update_connection(
+        self,
+        *,
+        client_id: str,
+        bridge_token: str,
+        network_mode: str,
+        bind: str,
+        port: int,
+    ) -> None:
+        """接続情報を config.json と .env へ保存する。
+
+        受信サーバ(bind/port)と Discord 接続(client_id)は **次回起動から反映**する
+        (MVP: 即時の再バインド/再接続は行わない)。メモリ上の config/secrets は更新する。
+        """
+        self._config["network_mode"] = network_mode
+        self._config["bind"] = bind
+        self._config["port"] = port
+        self._save()
+        Secrets.save(
+            self._env_path,
+            bridge_token=bridge_token,
+            discord_client_id=client_id,
+        )
+        self._secrets = Secrets(bridge_token=bridge_token, discord_client_id=client_id)
+
+    def current_connection(self) -> dict[str, Any]:
+        """GUI の初期値表示用に現在の接続情報を返す。"""
+        return {
+            "client_id": getattr(self._secrets, "discord_client_id", ""),
+            "bridge_token": getattr(self._secrets, "bridge_token", ""),
+            "network_mode": self._config.get("network_mode", "local"),
+            "bind": self._config.get("bind", "127.0.0.1"),
+            "port": self._config.get("port", 13520),
+        }
 
     # ---- 状態通知(GUI) ----
     def add_listener(self, callback: Callable[[], None]) -> None:

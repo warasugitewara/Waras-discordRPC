@@ -250,3 +250,72 @@ async def test_listener_notified_on_receiver_presence():
 
     assert len(calls) >= 1
     assert engine.active_source_id == "a"
+
+
+class _FakeSite:
+    captured: dict = {}
+
+    def __init__(self, runner, host, port):
+        _FakeSite.captured = {"host": host, "port": port}
+
+    async def start(self):
+        pass
+
+    async def stop(self):
+        pass
+
+
+async def test_start_uses_resolve_bind_for_lan(monkeypatch):
+    # network_mode=lan のとき bind が 0.0.0.0 に解決されることを TCPSite への引数で確認。
+    from core import engine as engine_mod
+
+    config = {"network_mode": "lan", "port": 13597, "ttl_seconds": 30}
+    monkeypatch.setattr(engine_mod.web, "TCPSite", _FakeSite)
+    engine = Engine(config, FakeSecrets(), discord_rpc=_connected_mock(), tick_interval=0.01)
+    await engine.start()
+    try:
+        assert _FakeSite.captured["host"] == "0.0.0.0"
+    finally:
+        await engine.stop()
+
+
+def test_update_connection_writes_env_and_config(tmp_path, monkeypatch):
+    from config.store import Secrets
+
+    store = ConfigStore(tmp_path / "config.json")
+    config = store.load()
+    env_path = tmp_path / ".env"
+    engine = Engine(
+        config, FakeSecrets(), store=store, env_path=env_path, discord_rpc=_connected_mock()
+    )
+
+    engine.update_connection(
+        client_id="555",
+        bridge_token="newtok",
+        network_mode="lan",
+        bind="0.0.0.0",
+        port=14000,
+    )
+
+    reloaded = store.load()
+    assert reloaded["network_mode"] == "lan"
+    assert reloaded["bind"] == "0.0.0.0"
+    assert reloaded["port"] == 14000
+
+    monkeypatch.delenv("BRIDGE_TOKEN", raising=False)
+    monkeypatch.delenv("DISCORD_CLIENT_ID", raising=False)
+    s = Secrets.load(env_path)
+    assert s.discord_client_id == "555"
+    assert s.bridge_token == "newtok"
+    assert engine.current_connection()["client_id"] == "555"
+
+
+def test_current_connection_returns_values():
+    config = {"network_mode": "local", "bind": "127.0.0.1", "port": 13520}
+    engine = Engine(config, FakeSecrets(), discord_rpc=_connected_mock())
+    cc = engine.current_connection()
+    assert cc["client_id"] == "123"
+    assert cc["bridge_token"] == "tok"
+    assert cc["network_mode"] == "local"
+    assert cc["bind"] == "127.0.0.1"
+    assert cc["port"] == 13520

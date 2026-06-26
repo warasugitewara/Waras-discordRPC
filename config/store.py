@@ -8,12 +8,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key
 
 CONFIG_VERSION = 1
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "version": CONFIG_VERSION,
+    # network_mode: "local"=127.0.0.1 / "lan"=0.0.0.0 / "custom"=bind の指定IP
     "network_mode": "local",
     "bind": "127.0.0.1",
     "port": 13520,
@@ -38,6 +39,20 @@ DEFAULT_CONFIG: dict[str, Any] = {
 }
 
 
+def resolve_bind(config: dict[str, Any]) -> str:
+    """network_mode を待ち受け bind アドレスへ解決する。
+
+    "lan"=全インターフェース(0.0.0.0) / "custom"=設定の bind(指定IP) /
+    それ以外("local" 既定や未知値)=ループバック(127.0.0.1, 誤公開を防ぐ安全側)。
+    """
+    mode = config.get("network_mode", "local")
+    if mode == "lan":
+        return "0.0.0.0"
+    if mode == "custom":
+        return config.get("bind", "127.0.0.1")
+    return "127.0.0.1"
+
+
 class ConfigStore:
     """`config.json` の読み込み・保存・バージョン移行を担う。"""
 
@@ -60,6 +75,9 @@ class ConfigStore:
         merged = copy.deepcopy(DEFAULT_CONFIG)
         merged.update(data)
         merged["version"] = CONFIG_VERSION
+        # 旧 network_mode="twingate"(local/twingate の2値時代)は custom(指定IP)へ移行。
+        if merged.get("network_mode") == "twingate":
+            merged["network_mode"] = "custom"
         return merged
 
 
@@ -78,3 +96,17 @@ class Secrets:
             bridge_token=os.environ.get("BRIDGE_TOKEN", ""),
             discord_client_id=os.environ.get("DISCORD_CLIENT_ID", ""),
         )
+
+    @staticmethod
+    def save(
+        env_path: Path | str,
+        *,
+        bridge_token: str,
+        discord_client_id: str,
+    ) -> None:
+        """.env の BRIDGE_TOKEN / DISCORD_CLIENT_ID を更新する(他キーは保持、無ければ作成)。"""
+        path = Path(env_path)
+        if not path.exists():
+            path.touch()
+        set_key(str(path), "BRIDGE_TOKEN", bridge_token)
+        set_key(str(path), "DISCORD_CLIENT_ID", discord_client_id)
