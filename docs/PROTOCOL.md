@@ -11,7 +11,7 @@ PC 受信側(本リポジトリ)と将来の Android 送信側が共有する**�
 - Android は **Twingate のプライベートオーバーレイ経由**で PC の
   **IP(または Twingate Resource DNS):port** へ接続する。
 - 経路は Twingate の認証済みオーバーレイ内。**公開ポート開放はしない**。
-- PC 側 bind は `network_mode`(`local`=127.0.0.1 / `twingate`=指定IP or 0.0.0.0)で切替。
+- PC 側 bind は `network_mode`(`local`=127.0.0.1 / `lan`=0.0.0.0 / `custom`=指定IP)で切替。
 - TLS はアプリ層では行わない(Twingate が経路を保護)。アプリは平文 HTTP/WS。
 
 ## 認証

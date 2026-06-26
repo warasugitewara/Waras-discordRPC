@@ -72,6 +72,7 @@
   TTL/heartbeat 自動 clear、レート制御(合体・最小15s間隔・同一 activity は再送しない)、WS 切断時 clear。
 - `config/store.py` … `config.json`(GUI 編集可)+ `.env`(秘密)読み書き。
 - `gui/tray.py` … トレイ常駐(開始/停止/設定を開く/状態/終了)。
+- `gui/setup_wizard.py` … 初回(Application ID 未設定時)に接続情報を入力させるウィザード。
 - `gui/config_window.py` … 設定画面。タブ: 接続/ネットワーク、**ソース一覧**(各行で
   有効/無効トグル・優先度↑↓・active ピン・stale 表示・「忘れる」)、**手動モード編集**
   (activity_type/details/state/画像/ボタン/タイムスタンプ + プレビュー + オンライン化)、
@@ -139,7 +140,7 @@ WS 切断時はその conn が供給した `source_id` 群を即時失効(`auto_
 ## 設定(config.json は GUI 編集 / 秘密は .env)
 - `.env`: `BRIDGE_TOKEN`(共有トークン), `DISCORD_CLIENT_ID`。`.env.example` を同梱。
 - `config.json`(先頭に `version` を持ち将来移行可能に):
-  - `network_mode`(`"local"`=127.0.0.1 / `"twingate"`=指定IP or 0.0.0.0)、`bind`(IP)/`port`
+  - `network_mode`(`"local"`=127.0.0.1 / `"lan"`=0.0.0.0 / `"custom"`=指定IP)、`bind`(IP)/`port`
   - `client_id` 既定 + ソース別上書き、`selection_policy`(`"priority"`)
   - `sources`(既知ソースの `{ source_id: { name, enabled, priority, pinned } }` を永続)
   - `manual`(手動ソースの `ManualData`)
@@ -161,7 +162,7 @@ WS 切断時はその conn が供給した `source_id` 群を即時失効(`auto_
 - **Twingate 前提**: PC を Twingate Resource(IP + 対象 port のみ)として公開し、Android は
   Twingate クライアントとしてアクセス。**ポート開放/公開エンドポイント不要**、
   ユーザ単位の認証付きオーバーレイ内通信 = 外部露出を最小化。Cloudflare Tunnel は代替。
-- 多層防御: **共有トークン認証 + 受信レート制限**。`network_mode=twingate` でもトークン必須。
+- 多層防御: **共有トークン認証 + 受信レート制限**。`network_mode=lan`(0.0.0.0)でもトークン必須。
 - bind は必要 IP のみ。`network_mode=local` 既定で誤公開を防止。
 - 入力は pydantic で検証(buttons 数 / URL スキーム / 文字長など)。
 - TLS: Twingate オーバーレイ内のためアプリは平文 HTTP/WS で可(経路は Twingate が保護)。
