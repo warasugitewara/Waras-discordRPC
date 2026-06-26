@@ -66,17 +66,32 @@ def main(argv: list[str] | None = None) -> int:
     store = ConfigStore(Path("config.json"))
     secrets = Secrets.load()
 
-    if not secrets.discord_client_id:
-        logger.warning("DISCORD_CLIENT_ID が未設定です(.env を確認してください)")
-
     app = QApplication(argv if argv is not None else sys.argv)
     app.setApplicationName("Wara's-discordRPC")
     app.setQuitOnLastWindowClosed(False)  # ウィンドウを閉じてもトレイ常駐を続ける
 
+    # 初回(Application ID 未設定)はセットアップウィザードで接続情報を入力させる。
+    if not secrets.discord_client_id:
+        from gui.setup_wizard import SetupWizard
+
+        wizard = SetupWizard()
+        if wizard.exec():
+            vals = wizard.values()
+            Secrets.save(
+                Path(".env"),
+                bridge_token=vals["bridge_token"],
+                discord_client_id=vals["client_id"],
+            )
+            config["network_mode"] = vals["network_mode"]
+            store.save(config)
+            secrets = Secrets.load()
+        else:
+            logger.warning("初期設定がキャンセルされました。設定タブから後で設定できます。")
+
     loop = qasync.QEventLoop(app)
     asyncio.set_event_loop(loop)
 
-    engine = Engine(config, secrets, store=store)
+    engine = Engine(config, secrets, store=store, env_path=Path(".env"))
     window = ConfigWindow(engine, _schedule)
 
     def open_settings() -> None:

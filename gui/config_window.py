@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QSpinBox,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -30,6 +31,13 @@ Scheduler = Callable[[Awaitable[Any]], Any]
 
 ACTIVITY_TYPES = ["playing", "listening", "watching", "competing"]
 
+# 表示ラベル ↔ network_mode の値。
+NETWORK_MODES: list[tuple[str, str]] = [
+    ("ローカルのみ", "local"),
+    ("LAN全体", "lan"),
+    ("カスタムIP", "custom"),
+]
+
 
 class ConfigWindow(QWidget):
     def __init__(self, engine: Any, schedule: Scheduler, parent: QWidget | None = None) -> None:
@@ -39,6 +47,7 @@ class ConfigWindow(QWidget):
         self.setWindowTitle("Wara's-discordRPC 設定")
 
         tabs = QTabWidget()
+        tabs.addTab(self._build_connection_tab(), "接続")
         tabs.addTab(self._build_sources_tab(), "ソース一覧")
         tabs.addTab(self._build_manual_tab(), "手動モード")
         self._preview = PreviewWidget()
@@ -49,6 +58,92 @@ class ConfigWindow(QWidget):
 
         engine.add_listener(self.refresh)
         self.refresh()
+
+    # ---- 接続タブ ----
+    def _build_connection_tab(self) -> QWidget:
+        widget = QWidget()
+        form = QFormLayout(widget)
+
+        self._c_client_id = QLineEdit()
+        self._c_token = QLineEdit()
+        gen_btn = QPushButton("生成")
+        gen_btn.clicked.connect(self._on_generate_token)
+        token_row = QHBoxLayout()
+        token_row.addWidget(self._c_token)
+        token_row.addWidget(gen_btn)
+        token_container = QWidget()
+        token_container.setLayout(token_row)
+
+        self._c_mode = QComboBox()
+        self._c_mode.addItems([label for label, _ in NETWORK_MODES])
+        self._c_mode.currentTextChanged.connect(self._on_mode_changed)
+
+        self._c_bind = QLineEdit()
+        self._c_port = QSpinBox()
+        self._c_port.setRange(1, 65535)
+
+        form.addRow("Application ID", self._c_client_id)
+        form.addRow("Bridge Token", token_container)
+        form.addRow("ネットワークモード", self._c_mode)
+        form.addRow("カスタムIP (bind)", self._c_bind)
+        form.addRow("ポート", self._c_port)
+
+        info = QLabel(
+            "Application ID は Discord Developer Portal のアプリの ID です。\n"
+            "Bridge Token は送信側(スマホ等)と共有する合言葉です。\n"
+            "変更は保存後、アプリを再起動すると反映されます。"
+        )
+        info.setWordWrap(True)
+        info.setStyleSheet("color: #555;")
+        form.addRow(info)
+
+        save_btn = QPushButton("保存")
+        save_btn.clicked.connect(self._on_save_connection)
+        form.addRow(save_btn)
+
+        self._load_connection_into_form()
+        return widget
+
+    def _mode_value(self) -> str:
+        label = self._c_mode.currentText()
+        for lbl, value in NETWORK_MODES:
+            if lbl == label:
+                return value
+        return "local"
+
+    def _set_mode_by_value(self, value: str) -> None:
+        for lbl, val in NETWORK_MODES:
+            if val == value:
+                self._c_mode.setCurrentText(lbl)
+                return
+        self._c_mode.setCurrentText(NETWORK_MODES[0][0])
+
+    def _on_mode_changed(self, _label: str) -> None:
+        # bind(カスタムIP)欄は network_mode=custom のときのみ編集可能。
+        self._c_bind.setEnabled(self._mode_value() == "custom")
+
+    def _load_connection_into_form(self) -> None:
+        cc = self._engine.current_connection()
+        self._c_client_id.setText(cc.get("client_id", "") or "")
+        self._c_token.setText(cc.get("bridge_token", "") or "")
+        self._set_mode_by_value(cc.get("network_mode", "local"))
+        self._c_bind.setText(cc.get("bind", "127.0.0.1") or "127.0.0.1")
+        self._c_port.setValue(int(cc.get("port", 13520) or 13520))
+        self._on_mode_changed(self._c_mode.currentText())
+
+    def _on_generate_token(self) -> None:
+        import secrets as secrets_mod
+
+        self._c_token.setText(secrets_mod.token_urlsafe(24))
+
+    def _on_save_connection(self) -> None:
+        self._engine.update_connection(
+            client_id=self._c_client_id.text().strip(),
+            bridge_token=self._c_token.text().strip(),
+            network_mode=self._mode_value(),
+            bind=self._c_bind.text().strip() or "127.0.0.1",
+            port=int(self._c_port.value()),
+        )
 
     # ---- ソース一覧タブ ----
     def _build_sources_tab(self) -> QWidget:

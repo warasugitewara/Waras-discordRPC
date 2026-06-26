@@ -89,6 +89,20 @@ class FakeEngine:
     async def clear_manual(self):
         self.calls.append(("clear_manual",))
 
+    def current_connection(self):
+        return {
+            "client_id": "cid123",
+            "bridge_token": "tok",
+            "network_mode": "local",
+            "bind": "127.0.0.1",
+            "port": 13520,
+        }
+
+    def update_connection(self, *, client_id, bridge_token, network_mode, bind, port):
+        self.calls.append(
+            ("update_connection", client_id, bridge_token, network_mode, bind, port)
+        )
+
 
 def make_scheduler(engine):
     scheduled = []
@@ -157,3 +171,80 @@ def test_config_window_manual_apply_schedules_engine_call(qapp):
     manual_calls = [c for c in engine.calls if c[0] == "manual"]
     assert len(manual_calls) == 1
     assert manual_calls[0][1]["details"] == "Working"
+
+
+def test_config_window_connection_tab_loads_current_values(qapp):
+    from gui.config_window import ConfigWindow
+
+    engine = FakeEngine()
+    schedule, _ = make_scheduler(engine)
+    window = ConfigWindow(engine, schedule)
+
+    assert window._c_client_id.text() == "cid123"
+    assert window._c_token.text() == "tok"
+    assert window._c_port.value() == 13520
+
+
+def test_config_window_connection_save_calls_update_connection(qapp):
+    from gui.config_window import ConfigWindow
+
+    engine = FakeEngine()
+    schedule, _ = make_scheduler(engine)
+    window = ConfigWindow(engine, schedule)
+
+    window._c_client_id.setText("999")
+    window._c_token.setText("newtok")
+    window._on_save_connection()
+
+    calls = [c for c in engine.calls if c[0] == "update_connection"]
+    assert len(calls) == 1
+    assert calls[0][1] == "999"  # client_id
+    assert calls[0][2] == "newtok"  # bridge_token
+
+
+def test_config_window_connection_mode_toggles_bind_enabled(qapp):
+    from gui.config_window import ConfigWindow
+
+    engine = FakeEngine()
+    schedule, _ = make_scheduler(engine)
+    window = ConfigWindow(engine, schedule)
+
+    # local 既定では bind 欄は無効
+    assert not window._c_bind.isEnabled()
+    # カスタムIP を選ぶと bind 欄が有効化
+    window._c_mode.setCurrentText("カスタムIP")
+    assert window._c_bind.isEnabled()
+
+
+def test_config_window_connection_generate_token_fills_field(qapp):
+    from gui.config_window import ConfigWindow
+
+    engine = FakeEngine()
+    schedule, _ = make_scheduler(engine)
+    window = ConfigWindow(engine, schedule)
+
+    window._c_token.setText("")
+    window._on_generate_token()
+    assert window._c_token.text() != ""
+
+
+def test_setup_wizard_builds_with_generated_token(qapp):
+    from gui.setup_wizard import SetupWizard
+
+    wizard = SetupWizard()
+    # Bridge Token は自動生成済み(空でない)
+    assert wizard._token.text() != ""
+
+
+def test_setup_wizard_values_returns_inputs(qapp):
+    from gui.setup_wizard import SetupWizard
+
+    wizard = SetupWizard()
+    wizard._client_id.setText("123456")
+    wizard._token.setText("mytoken")
+    wizard._mode.setCurrentText("LAN全体")
+
+    values = wizard.values()
+    assert values["client_id"] == "123456"
+    assert values["bridge_token"] == "mytoken"
+    assert values["network_mode"] == "lan"
