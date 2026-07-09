@@ -14,6 +14,8 @@ Discord のローカル IPC(名前付きパイプ)は同じ PC 上のプロセ�
 - 権威ある仕様(SoT):
   - 設計全体 … [`docs/DESIGN.md`](docs/DESIGN.md)
   - 通信契約(Android↔PC)… [`docs/PROTOCOL.md`](docs/PROTOCOL.md)
+  - 繋がらないときの切り分け … [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)
+    (認証不要の `GET /ping` で経路と設定の問題を分離できる)
 
 ### 進捗(マイルストーン)
 | # | マイルストーン | 状態 | 主なファイル |
