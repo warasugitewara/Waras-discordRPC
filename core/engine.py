@@ -31,6 +31,27 @@ logger = logging.getLogger(__name__)
 MANUAL_SOURCE_ID = "manual"
 DEFAULT_TICK_INTERVAL = 5.0
 
+_LOOPBACK_BINDS = ("", "127.0.0.1", "localhost", "::1")
+
+
+def resolve_bind(config: dict[str, Any]) -> str:
+    """config の network_mode / bind から実際に listen するアドレスを決める。
+
+    network_mode="twingate" なのに bind がループバックのままだと、Twingate
+    (LAN/オーバーレイ)側から一切到達できず「接続できない」の典型原因になる。
+    その組み合わせは 0.0.0.0 に昇格させ、警告ログで知らせる。
+    """
+    mode = config.get("network_mode", "local")
+    bind = str(config.get("bind", "127.0.0.1")).strip()
+    if mode == "twingate" and bind in _LOOPBACK_BINDS:
+        logger.warning(
+            "network_mode=twingate ですが bind=%r はループバックのため外部から到達できません。"
+            "0.0.0.0 で listen します(config.json の bind を明示設定すると固定できます)。",
+            bind,
+        )
+        return "0.0.0.0"
+    return bind or "127.0.0.1"
+
 
 class _NotifyingPresenceManager:
     """receiver(HTTP/WS)経由の reevaluate でも GUI リスナーへ通知する PresenceManager ラッパー。
@@ -116,11 +137,24 @@ class Engine:
         )
         self._runner = web.AppRunner(app)
         await self._runner.setup()
-        bind = self._config.get("bind", "127.0.0.1")
+        bind = resolve_bind(self._config)
         port = self._config.get("port", 13520)
         self._site = web.TCPSite(self._runner, bind, port)
-        await self._site.start()
-        logger.info("受信サーバ起動: http://%s:%s", bind, port)
+        try:
+            await self._site.start()
+        except OSError as exc:
+            logger.error(
+                "受信サーバを %s:%s で起動できませんでした (%s)。"
+                "bind がこの PC のインターフェースに存在しない IP の場合は 0.0.0.0 を、"
+                "ポート使用中の場合は port の変更を検討してください。"
+                "Twingate の Resource IP は PC 側インターフェースには付与されないため bind には使えません。",
+                bind, port, exc,
+            )
+            raise
+        logger.info(
+            "受信サーバ起動: http://%s:%s (network_mode=%s) — 到達確認は認証不要の GET /ping が使えます",
+            bind, port, self._config.get("network_mode", "local"),
+        )
         self._tick_task = asyncio.create_task(self._tick_loop())
 
     async def stop(self) -> None:

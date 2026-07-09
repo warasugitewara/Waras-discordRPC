@@ -250,3 +250,28 @@ async def test_listener_notified_on_receiver_presence():
 
     assert len(calls) >= 1
     assert engine.active_source_id == "a"
+
+
+# ---- resolve_bind(network_mode と bind の整合) ----
+
+def test_resolve_bind_local_keeps_loopback():
+    from core.engine import resolve_bind
+    assert resolve_bind({"network_mode": "local", "bind": "127.0.0.1"}) == "127.0.0.1"
+
+
+def test_resolve_bind_twingate_promotes_loopback_to_any():
+    """twingate モードでループバック bind のままだと外部から到達できないため昇格する。"""
+    from core.engine import resolve_bind
+    assert resolve_bind({"network_mode": "twingate", "bind": "127.0.0.1"}) == "0.0.0.0"
+    assert resolve_bind({"network_mode": "twingate", "bind": ""}) == "0.0.0.0"
+    assert resolve_bind({"network_mode": "twingate"}) == "0.0.0.0"
+
+
+def test_resolve_bind_twingate_respects_explicit_bind():
+    from core.engine import resolve_bind
+    assert resolve_bind({"network_mode": "twingate", "bind": "192.168.1.20"}) == "192.168.1.20"
+
+
+def test_resolve_bind_defaults():
+    from core.engine import resolve_bind
+    assert resolve_bind({}) == "127.0.0.1"
