@@ -202,3 +202,10 @@ async def test_ws_rate_limit_triggers_error_op():
         await ws.send_json({"op": "ping"})
         result = await ws.receive_json()
         assert result == {"op": "error", "message": "rate limit exceeded"}
+
+
+async def test_ping_is_reachable_without_auth(client):
+    """/ping は認証不要で疎通確認に使える(情報は返さない)。"""
+    resp = await client.get("/ping")
+    assert resp.status == 200
+    assert await resp.json() == {"pong": True}

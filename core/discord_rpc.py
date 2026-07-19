@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from typing import Any, Literal, Protocol
+from typing import Any, Literal
 
 from pypresence import AioPresence
 from pypresence.exceptions import PyPresenceException
@@ -33,22 +33,16 @@ SUPERVISOR_POLL_INTERVAL = 1.0
 _CONNECTION_ERRORS = (PyPresenceException, OSError)
 
 
-class PresenceClient(Protocol):
-    async def connect(self) -> None: ...
-    async def update(self, **kwargs: Any) -> Any: ...
-    async def clear(self) -> Any: ...
-
-
 class DiscordRPC:
     def __init__(
         self,
         client_id: str,
         on_state_change: Any = None,
-        presence_client: PresenceClient | None = None,
+        presence_client: Any | None = None,
     ) -> None:
         self._client_id = client_id
         self._on_state_change = on_state_change
-        self._presence: PresenceClient = presence_client or AioPresence(client_id)
+        self._presence: Any = presence_client or AioPresence(client_id)
         self._connected = False
         self._closing = False
         self._supervisor_task: asyncio.Task[None] | None = None

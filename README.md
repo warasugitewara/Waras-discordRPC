@@ -49,6 +49,7 @@ python app.py                  # トレイ常駐 + 受信サーバ(Discord を�
 | 導入・使い方 | [`docs/SETUP.md`](docs/SETUP.md) |
 | 設計全体(SoT) | [`docs/DESIGN.md`](docs/DESIGN.md) |
 | 通信契約 Android↔PC(SoT) | [`docs/PROTOCOL.md`](docs/PROTOCOL.md) |
+| 繋がらないときの切り分け | [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)(認証不要の `GET /ping` で経路と設定を分離) |
 | エージェント向けガイド | [`AGENTS.md`](AGENTS.md) |
 
 送信側(Android)は別リポジトリ [Waras-AppleMusic-RPC](https://github.com/warasugitewara/Waras-AppleMusic-RPC)。

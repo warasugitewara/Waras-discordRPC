@@ -68,6 +68,7 @@ PC 受信側(本リポジトリ)と将来の Android 送信側が共有する**�
 | POST | `/presence` | `{ "kind", "source_id", "source_name"?, "data" }` | `200 { "ok": true }` |
 | POST | `/clear` | `{ "source_id"? }`(省略=全) | `200 { "ok": true }` |
 | GET | `/health` | — | `{ "status":"ok", "discord":"connected"|"disconnected", "active_source": str|null }` |
+| GET | `/ping` | —(**認証不要**) | `200 { "pong": true }` — 到達確認専用。状態情報は返さない |
 
 ---
 

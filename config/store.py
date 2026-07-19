@@ -75,9 +75,15 @@ class ConfigStore:
         merged = copy.deepcopy(DEFAULT_CONFIG)
         merged.update(data)
         merged["version"] = CONFIG_VERSION
-        # 旧 network_mode="twingate"(local/twingate の2値時代)は custom(指定IP)へ移行。
+        # 旧 network_mode="twingate"(local/twingate の2値時代)の移行:
+        # bind がループバック/未設定なら旧実装の「0.0.0.0 昇格」を保存するため lan、
+        # 明示 IP が指定されていれば custom(そのIPで待ち受け)へ。
         if merged.get("network_mode") == "twingate":
-            merged["network_mode"] = "custom"
+            bind = str(merged.get("bind", "")).strip()
+            if bind in ("", "127.0.0.1", "localhost", "::1"):
+                merged["network_mode"] = "lan"
+            else:
+                merged["network_mode"] = "custom"
         return merged
 
 

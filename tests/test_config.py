@@ -47,13 +47,27 @@ def test_secrets_save_creates_file_when_missing(tmp_path, monkeypatch):
     assert secrets.discord_client_id == "9"
 
 
-def test_migrate_converts_legacy_twingate_to_custom(tmp_path):
+def test_migrate_converts_legacy_twingate_loopback_to_lan(tmp_path):
+    # 旧実装は twingate+ループバック bind を 0.0.0.0 に昇格していたため lan で挙動を保存する。
     path = tmp_path / "config.json"
     path.write_text(json.dumps({"version": 1, "network_mode": "twingate"}), encoding="utf-8")
 
     config = ConfigStore(path).load()
 
+    assert config["network_mode"] == "lan"
+
+
+def test_migrate_converts_legacy_twingate_explicit_bind_to_custom(tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps({"version": 1, "network_mode": "twingate", "bind": "192.168.1.20"}),
+        encoding="utf-8",
+    )
+
+    config = ConfigStore(path).load()
+
     assert config["network_mode"] == "custom"
+    assert config["bind"] == "192.168.1.20"
 
 
 def test_load_returns_default_when_missing(tmp_path):

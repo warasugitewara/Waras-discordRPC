@@ -25,13 +25,12 @@ from core.mapper import to_activity
 from core.models import ManualData
 from core.presence_manager import PresenceManager
 from core.receiver import create_app
-from core.sources import SourceRegistry
+from core.sources import Source, SourceRegistry
 
 logger = logging.getLogger(__name__)
 
 MANUAL_SOURCE_ID = "manual"
 DEFAULT_TICK_INTERVAL = 5.0
-
 
 class _NotifyingPresenceManager:
     """receiver(HTTP/WS)経由の reevaluate でも GUI リスナーへ通知する PresenceManager ラッパー。
@@ -122,8 +121,21 @@ class Engine:
         bind = resolve_bind(self._config)
         port = self._config.get("port", 13520)
         self._site = web.TCPSite(self._runner, bind, port)
-        await self._site.start()
-        logger.info("受信サーバ起動: http://%s:%s", bind, port)
+        try:
+            await self._site.start()
+        except OSError as exc:
+            logger.error(
+                "受信サーバを %s:%s で起動できませんでした (%s)。"
+                "bind がこの PC のインターフェースに存在しない IP の場合は 0.0.0.0 を、"
+                "ポート使用中の場合は port の変更を検討してください。"
+                "Twingate の Resource IP は PC 側インターフェースには付与されないため bind には使えません。",
+                bind, port, exc,
+            )
+            raise
+        logger.info(
+            "受信サーバ起動: http://%s:%s (network_mode=%s) — 到達確認は認証不要の GET /ping が使えます",
+            bind, port, self._config.get("network_mode", "local"),
+        )
         self._tick_task = asyncio.create_task(self._tick_loop())
 
     async def stop(self) -> None:
@@ -279,6 +291,15 @@ class Engine:
             return
         self._registry.upsert(MANUAL_SOURCE_ID, "manual", data, name=self._manual_name())
 
+    @staticmethod
+    def _source_settings_dict(s: Source) -> dict[str, Any]:
+        return {
+            "name": s.name,
+            "enabled": s.enabled,
+            "priority": s.priority,
+            "pinned": s.pinned,
+        }
+
     def _reconcile_new_sources(self) -> None:
         """feed で初出したソースを config に永続化する(GUI で管理できるように)。"""
         sources_cfg = self._config.setdefault("sources", {})
@@ -287,12 +308,7 @@ class Engine:
             if s.kind == "manual":
                 continue
             if s.source_id not in sources_cfg:
-                sources_cfg[s.source_id] = {
-                    "name": s.name,
-                    "enabled": s.enabled,
-                    "priority": s.priority,
-                    "pinned": s.pinned,
-                }
+                sources_cfg[s.source_id] = self._source_settings_dict(s)
                 dirty = True
         if dirty:
             self._save()
@@ -301,12 +317,7 @@ class Engine:
         s = self._registry.get(source_id)
         if s is None or s.kind == "manual":
             return
-        self._config.setdefault("sources", {})[source_id] = {
-            "name": s.name,
-            "enabled": s.enabled,
-            "priority": s.priority,
-            "pinned": s.pinned,
-        }
+        self._config.setdefault("sources", {})[source_id] = self._source_settings_dict(s)
         self._save()
 
     def _save(self) -> None:

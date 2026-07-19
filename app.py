@@ -8,6 +8,7 @@ config/.env 読込 → QApplication + qasync ループ起動 → Engine を結�
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import signal
 import sys
@@ -62,8 +63,8 @@ def main(argv: list[str] | None = None) -> int:
     from gui.config_window import ConfigWindow
     from gui.tray import Tray
 
-    config = ConfigStore(Path("config.json")).load()
     store = ConfigStore(Path("config.json"))
+    config = store.load()
     secrets = Secrets.load()
 
     app = QApplication(argv if argv is not None else sys.argv)
@@ -117,20 +118,14 @@ def main(argv: list[str] | None = None) -> int:
     tray = Tray(engine, on_open_settings=open_settings, on_quit=quit_app, icon=icon, parent=window)
     tray.show()
 
-    with contextlib_suppress():
+    # Windows では SIGINT のハンドラ設定が一部制限されるため握りつぶす。
+    with contextlib.suppress(ValueError, RuntimeError, AttributeError):
         signal.signal(signal.SIGINT, lambda *_: quit_app())
 
     with loop:
         loop.create_task(engine.start())
         loop.run_forever()
     return 0
-
-
-def contextlib_suppress() -> Any:
-    import contextlib
-
-    # Windows では SIGINT のハンドラ設定が一部制限されるため握りつぶす。
-    return contextlib.suppress(ValueError, RuntimeError, AttributeError)
 
 
 if __name__ == "__main__":

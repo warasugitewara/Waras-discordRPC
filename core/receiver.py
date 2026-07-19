@@ -108,13 +108,16 @@ def create_app(
         await presence_manager.reevaluate()
 
     async def handle_ws(request: web.Request) -> web.WebSocketResponse:
+        peer = request.remote
         ws = web.WebSocketResponse(heartbeat=30)
         await ws.prepare(request)
 
         if not _authorized(request):
+            logger.warning("WS 認証失敗 (peer=%s): BRIDGE_TOKEN 不一致のため close(4001)", peer)
             await ws.close(code=4001, message=b"unauthorized")
             return ws
 
+        logger.info("WS 接続確立 (peer=%s)", peer)
         await ws.send_json({"op": "ready"})
 
         async for msg in ws:
@@ -152,6 +155,7 @@ def create_app(
             else:
                 await ws.send_json({"op": "error", "message": f"unknown op: {op}"})
 
+        logger.info("WS 切断 (peer=%s, close_code=%s)", peer, ws.close_code)
         limiter.release(ws)
         registry.expire_for_conn(ws)
         await presence_manager.reevaluate()
@@ -159,6 +163,7 @@ def create_app(
 
     async def handle_presence(request: web.Request) -> web.Response:
         if not _authorized(request):
+            logger.warning("HTTP /presence 認証失敗 (peer=%s)", request.remote)
             return web.json_response({"ok": False, "error": "unauthorized"}, status=401)
         if not limiter.allow(request.remote):
             return web.json_response({"ok": False, "error": "rate limited"}, status=429)
@@ -190,6 +195,7 @@ def create_app(
 
     async def handle_health(request: web.Request) -> web.Response:
         if not _authorized(request):
+            logger.warning("HTTP /health 認証失敗 (peer=%s)", request.remote)
             return web.json_response({"ok": False, "error": "unauthorized"}, status=401)
         return web.json_response(
             {
@@ -199,8 +205,16 @@ def create_app(
             }
         )
 
+    async def handle_ping(request: web.Request) -> web.Response:
+        # 認証不要の到達確認。スマホのブラウザで http://<PC>:<port>/ping を開けば
+        # 「Twingate 経路の問題」か「トークン等アプリ設定の問題」かを切り分けられる。
+        # 情報は返さない(疎通の事実のみ)。
+        logger.info("GET /ping (peer=%s)", request.remote)
+        return web.json_response({"pong": True})
+
     app.router.add_get("/ws", handle_ws)
     app.router.add_post("/presence", handle_presence)
     app.router.add_post("/clear", handle_clear)
     app.router.add_get("/health", handle_health)
+    app.router.add_get("/ping", handle_ping)
     return app
