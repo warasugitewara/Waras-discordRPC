@@ -156,9 +156,12 @@ class Engine:
         """TTL 失効の反映と、保留更新の合体フラッシュ(最小間隔経過後の送出)。"""
         while True:
             await asyncio.sleep(self._tick_interval)
-            self._reconcile_new_sources()
-            if await self._pm.reevaluate():
-                self._notify()
+            try:
+                self._reconcile_new_sources()
+                if await self._pm.reevaluate():
+                    self._notify()
+            except Exception:  # 想定外の例外で tick(TTL失効/合体フラッシュ)を止めない
+                logger.exception("tick 処理でエラー")
 
     # ---- GUI 操作 ----
     async def set_source_enabled(self, source_id: str, enabled: bool) -> None:

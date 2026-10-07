@@ -136,3 +136,31 @@ async def test_stop_clears_when_connected():
 
     client.clear.assert_awaited_once()
     assert rpc.connected is False
+
+
+async def test_ipc_calls_are_serialized():
+    # pypresence は1ソケットで送信→応答 read するため、update/clear を並行させない。
+    import asyncio
+
+    in_flight = 0
+    max_in_flight = 0
+
+    async def slow(*args, **kwargs):
+        nonlocal in_flight, max_in_flight
+        in_flight += 1
+        max_in_flight = max(max_in_flight, in_flight)
+        await asyncio.sleep(0.05)
+        in_flight -= 1
+
+    presence = AsyncMock()
+    presence.update.side_effect = slow
+    presence.clear.side_effect = slow
+    rpc = make_rpc(presence_client=presence)
+    rpc._connected = True
+
+    results = await asyncio.gather(
+        rpc.set_activity({"details": "a"}), rpc.set_activity({"details": "b"}), rpc.clear()
+    )
+
+    assert results == [True, True, True]
+    assert max_in_flight == 1

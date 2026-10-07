@@ -173,3 +173,31 @@ def test_select_active_prefers_recent_updated_at_when_priority_tied():
     winner = select_active(registry.all())
 
     assert winner.source_id == "new"
+
+
+async def test_concurrent_reevaluate_is_serialized():
+    # receiver と tick から同時に reevaluate されても Discord 送信は重ならず、
+    # 2 回目は 1 回目の送信結果を見てレート制御される(IPC 二重 read の回帰防止)。
+    import asyncio
+
+    registry, discord_rpc, clock, manager = make_manager({"min_update_interval": 15})
+    in_flight = 0
+    max_in_flight = 0
+
+    async def slow_set_activity(activity):
+        nonlocal in_flight, max_in_flight
+        in_flight += 1
+        max_in_flight = max(max_in_flight, in_flight)
+        await asyncio.sleep(0.05)
+        in_flight -= 1
+        return True
+
+    discord_rpc.set_activity.side_effect = slow_set_activity
+    registry.upsert("a", "generic", {"details": "first"})
+    first = asyncio.create_task(manager.reevaluate())
+    await asyncio.sleep(0)
+    registry.upsert("a", "generic", {"details": "second"})
+    await asyncio.gather(first, manager.reevaluate())
+
+    assert max_in_flight == 1
+    assert discord_rpc.set_activity.await_count == 1
