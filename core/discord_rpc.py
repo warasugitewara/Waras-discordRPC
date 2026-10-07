@@ -46,6 +46,9 @@ class DiscordRPC:
         self._connected = False
         self._closing = False
         self._supervisor_task: asyncio.Task[None] | None = None
+        # pypresence は1本のソケットで「送信→応答 read」を行うため、update/clear が
+        # 並行すると二重 read で RuntimeError になる。IPC 呼び出しを直列化する。
+        self._ipc_lock = asyncio.Lock()
 
     @property
     def connected(self) -> bool:
@@ -65,8 +68,9 @@ class DiscordRPC:
                 await self._supervisor_task
             self._supervisor_task = None
         if self._connected:
-            with contextlib.suppress(*_CONNECTION_ERRORS):
-                await self._presence.clear()
+            async with self._ipc_lock:
+                with contextlib.suppress(*_CONNECTION_ERRORS):
+                    await self._presence.clear()
         self._set_connected(False)
 
     async def set_activity(self, activity: dict[str, Any]) -> bool:
@@ -79,7 +83,8 @@ class DiscordRPC:
         if "activity_type" in payload and isinstance(payload["activity_type"], str):
             payload["activity_type"] = ACTIVITY_TYPE_MAP[payload["activity_type"]]
         try:
-            await self._presence.update(**payload)
+            async with self._ipc_lock:
+                await self._presence.update(**payload)
             return True
         except _CONNECTION_ERRORS as exc:
             logger.warning("activity送信失敗: %s", exc)
@@ -90,7 +95,8 @@ class DiscordRPC:
         if not self._connected:
             return False
         try:
-            await self._presence.clear()
+            async with self._ipc_lock:
+                await self._presence.clear()
             return True
         except _CONNECTION_ERRORS as exc:
             logger.warning("clear失敗: %s", exc)

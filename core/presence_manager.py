@@ -1,6 +1,7 @@
 """SourceRegistry を調停して勝者を選び、mapper→discord_rpc へ送る。"""
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import Any, Callable
 
@@ -38,6 +39,12 @@ class PresenceManager:
         self._last_sent_data: dict[str, Any] | None = None
         self._last_sent_at: float = 0.0
         self._active_source_id: str | None = None
+        # reevaluate は receiver(WS/HTTP)と Engine の tick から並行に呼ばれる。
+        # Discord への送信(IPC 応答待ち)中に別の reevaluate が割り込むと、pypresence が
+        # 同じソケットを二重に read して RuntimeError になり、呼び出し元(tick ループ等)が
+        # 死ぬ。また送信中は _last_sent_* が未更新のためレート制御もすり抜ける。
+        # 調停〜送信を直列化してこれを防ぐ。
+        self._lock = asyncio.Lock()
 
     @property
     def active_source_id(self) -> str | None:
@@ -45,6 +52,10 @@ class PresenceManager:
 
     async def reevaluate(self) -> bool:
         """調停し、必要なら Discord へ送信する。送信/clearを行ったら True を返す。"""
+        async with self._lock:
+            return await self._reevaluate_locked()
+
+    async def _reevaluate_locked(self) -> bool:
         now = self._clock()
         winner = select_active(self._registry.all(), now)
 
